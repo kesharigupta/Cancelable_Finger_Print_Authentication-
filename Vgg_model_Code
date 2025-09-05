@@ -1,0 +1,117 @@
+import os
+from sklearn.random_projection import SparseRandomProjection, johnson_lindenstrauss_min_dim
+from sklearn.random_projection import GaussianRandomProjection
+import numpy as np
+from matplotlib import pyplot as plt
+import sklearn.datasets as dt
+from sklearn.metrics.pairwise import euclidean_distances
+from tensorflow.keras.applications import VGG19
+from keras.models import Model
+import cv2 as cv
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import BaggingClassifier
+from xgboost import XGBClassifier
+from sklearn.model_selection import train_test_split
+
+def get_model():
+    model1 =VGG19(include_top=True, weights='imagenet')
+    model2 = Model(inputs=model1.input, outputs=model1.layers[-3].output)
+    return model2
+
+folder_path = '/content/drive/MyDrive/Birjand University Mobile Palmprint Database (BMPD)/'
+folders = os.listdir(folder_path)
+
+model = get_model()
+
+features = []
+cls_list = []
+for folder in folders:
+    print(folder)
+    cls = folder
+    class_folder_path = folder_path + folder
+    if os.path.isdir(class_folder_path):
+        image_files = os.listdir(class_folder_path)
+        for image_file in image_files:
+            if image_file.endswith('.JPG'):
+                #print(image_file)
+                img = cv.imread(class_folder_path + "/" + image_file)
+                img = cv.resize(img, (224, 224))
+                img = np.reshape(img, newshape=(1, 224, 224, 3))
+
+                x = model.predict(img).flatten()
+                features.append(x)
+                cls_list.append(cls)
+
+features = np.array(features)
+print(features.shape)
+
+le = LabelEncoder()
+le.fit(cls_list)
+cls_list = le.transform(cls_list)
+#print(cls_list)
+
+X_train, X_test, Y_train, Y_test = train_test_split(features, cls_list, test_size=0.3)
+
+rfc = RandomForestClassifier()
+rfc.fit(X_train, Y_train)
+print('Model fitting done')
+print('trainning accuracy corresponding to Random Forest Classifier')
+score_train=rfc.score(X_train, Y_train)
+print(score_train)
+score = rfc.score(X_test, Y_test)
+print('testing accuracy corresponding to Random Forest Classifier')
+print(score)
+
+rfc = BaggingClassifier()
+rfc.fit(X_train, Y_train)
+print('Model fitting done')
+score_train=rfc.score(X_train, Y_train)
+print('Training Accuracy corresponding to bagging classifers')
+print(score_train)
+score = rfc.score(X_test, Y_test)
+print('Testing Accuracy corresponding to bagging classifiers')
+print(score)
+
+
+features = np.array(features)
+#print(features.shape)
+
+le = LabelEncoder()
+le.fit(cls_list)
+cls_list = le.transform(cls_list)
+#print(cls_list)
+
+X_train, X_test, Y_train, Y_test = train_test_split(features, cls_list, test_size=0.3)
+#X_train= X_train.reshape(-1, 1)
+#X_test = X_test.reshape(-1, 1)
+#Y_train= Y_train.reshape(-1, 1)
+#Y_test = Y_test.reshape(-1, 1)
+
+projector = GaussianRandomProjection(n_components='auto',eps=0.50)
+X_train_new= projector.fit_transform(X_train)
+X_test_new= projector.transform(X_test)
+
+print("Accuracy After applying Random Projection")
+
+BGC=BaggingClassifier()
+BGC.fit(X_train_new, Y_train)
+score_train_new=BGC.score(X_train_new, Y_train)
+print('bagging classifier train accuracy')
+print(score_train_new)
+score_test_new= BGC.score(X_test_new,Y_test)
+print('bagging classifier test accuracy')
+print(score_test_new)
+print()
+
+RFC=RandomForestClassifier()
+RFC.fit(X_train_new, Y_train)
+score_train_new=RFC.score(X_train_new, Y_train)
+print('Random Forest classifier train accuracy')
+print(score_train_new)
+score_test_new= RFC.score(X_test_new,Y_test)
+print('Random Forest classifier test accuracy')
+print(score_test_new)
+print()
